@@ -3,7 +3,7 @@
 
 
 
-#%%
+#%% Extract rar files into corresponding folders
 
 import os
 from rarfile import RarFile
@@ -63,7 +63,7 @@ dict_gestures = {gesture: [] for gesture in GESTURES}
 
 # file name should include $gestureIndex. Skip other files
 for root, dirs, files in os.walk(DATA_ROOT):
-    print('root: ', root, ' dirs: ', dirs)
+    #print('root: ', root, ' dirs: ', dirs)
     for file in files:
         
         for gesture in GESTURES:
@@ -82,7 +82,7 @@ with open(os.path.join(path_save, 'gestures.pkl'), 'wb') as f:
 # Try extracting and loading in the same loop for efficiency
 
 
-#%% Load pickle
+#%% Load pickled data
 
 with open('data/combined-data/gestures.pkl', 'rb') as f:
     data = pickle.load(f)
@@ -90,24 +90,16 @@ with open('data/combined-data/gestures.pkl', 'rb') as f:
 data
 
 
-#%% Preprocessing
-
-# (x,y,z) should start at (0,0,0) at the start of each motion
-#TODO add preprocessing
-
-
-
 #%%
 # Integrate
 import scipy.integrate
 
 # A function to do numerical integration
-def integrate(dta):
-    data_integ = {gesture: [] for gesture in dta}
-    for key in dta:
-        print('key: ', key)
-        for i in range(len(dta[key])):
-            integrated = scipy.integrate.cumulative_trapezoid(dta[key][i], axis=0)
+def integrate(my_data):
+    data_integ = {gesture: [] for gesture in my_data}
+    for key in my_data:
+        for i in range(len(my_data[key])):
+            integrated = scipy.integrate.cumulative_trapezoid(my_data[key][i], axis=0)
             data_integ[key].append(integrated)
     return data_integ
 
@@ -120,45 +112,68 @@ data_pos = integrate(data_vel) # Position data
 
 import matplotlib.pyplot as plt
 
-def visualize(dta):
+def visualize(my_data, ges, idx):
     fig = plt.figure(figsize=(10,3))
     for i in range(3):
         plt.subplot(1,3,i+1)
-        y = dta[GESTURES[1]][1][:,i]
+        y = my_data[GESTURES[1]][1][:,i]
         x = range(len(y))
         plt.scatter(x=x, y=y, s=1)
     
     plt.show()
 
-visualize(data)
-visualize(data_vel)
-visualize(data_pos)
+gesture = GESTURES[0]
+idx_ges = 0
+visualize(data, gesture, idx_ges) # Acceleration
+visualize(data_vel, gesture, idx_ges) # Velocity
+visualize(data_pos, gesture, idx_ges) # Position
 
+
+#%% Visualize the data on a selected plane
+
+def visualize_plane(my_data, ges, idx, ax1, ax2):
+    fig = plt.figure(figsize=(6,4))
+    x = my_data[ges][idx][:,ax1]
+    y = -1.0 * my_data[ges][idx][:,ax2]
+    plt.scatter(x=x, y=y, c=np.arange(len(my_data[ges][idx])), cmap='viridis')
+
+gesture = GESTURES[0]
+idx_ges = 0
+ax1, ax2 = 0, 1
+visualize_plane(data_pos, gesture, idx_ges, ax1, ax2)
 
 #%% Interactive 3D Plotting
+
 import plotly.express as px
 
-# Parameters
-my_data = data_pos
-gesture = GESTURES[5]
+def visualize_3d(my_data, ges, idx):
+    time_ax = range(len(my_data[ges][idx])) # To have a color scheme for time
+
+    fig = px.scatter_3d(x=my_data[ges][idx][:,0],
+                        y=my_data[ges][idx][:,1],
+                        z=my_data[ges][idx][:,2],
+                        color=time_ax
+                        )
+    # Default parameters which are used when `layout.scene.camera` is not provided
+    scene=dict(
+            camera = dict(
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=0, y=0, z=0),
+            eye=dict(x=2.25, y=1.25, z=1.25)), #the default values are 1.25, 1.25, 1.25
+            xaxis=dict(),
+            yaxis=dict(),
+            zaxis=dict(),
+            aspectmode='data', #this string can be 'data', 'cube', 'auto', 'manual'
+            #a custom aspectratio is defined as follows:
+            aspectratio=dict(x=1, y=1, z=1)
+            )
+
+    fig.update_layout(scene=scene)
+    fig.show()
+
+gesture = GESTURES[0]
 idx_ges = 0
-
-time_ax = range(len(my_data[gesture][idx_ges])) # To have a color scheme for time
-
-fig = px.scatter_3d(x=my_data[gesture][idx_ges][:,0],
-                    y=my_data[gesture][idx_ges][:,1],
-                    z=my_data[gesture][idx_ges][:,2],
-                    color=time_ax
-                    )
-# Default parameters which are used when `layout.scene.camera` is not provided
-camera = dict(
-    up=dict(x=0, y=0, z=1),
-    center=dict(x=0, y=0, z=0),
-    eye=dict(x=1.25, y=1.25, z=1.25)
-)
-
-fig.update_layout(scene_camera=camera)
-fig
+visualize_3d(data_vel, gesture, idx_ges)
 
 #%%
 
