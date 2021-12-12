@@ -17,12 +17,12 @@ DATA_ROOT = "data/uWaveGestureLibrary"
 # Find all .rar files, extract them into separate folders and remove the .rar files
 for root, dirs, files in os.walk(DATA_ROOT):
     print('root: ', root, ' dirs: ', dirs)
-    for name in files:
-        if name.endswith((".rar")):
+    for file in files:
+        if file.endswith((".rar")):
 
-            rar_path = os.path.join(root, name)
+            rar_path = os.path.join(root, file)
             print(rar_path)
-            extract_path = os.path.join(root, name.replace('.rar', ''))
+            extract_path = os.path.join(root, file.replace('.rar', ''))
             os.mkdir(extract_path)
 
             with RarFile(rar_path) as rf: 
@@ -50,14 +50,36 @@ for root, dirs, files in os.walk(DATA_ROOT):
 # 8 gestures. 10 repetitions for each gesture by each user.
 # For each gesture, 3 columns: x-, y-, z-axis accelerations (unit is G)
 # 
-import pandas
+
+import pandas as pd
 import numpy as np
+import pickle
 
 g_indices = list(range(1,9))
-gestures = ["Acceleration" + str(idx) for idx in g_indices]
-gestures
+GESTURES = ["Acceleration" + str(idx) for idx in g_indices]
 
+# Create a dictionary where the key is gesture index and the values are series for each gesture
+dict_gestures = {gesture: [] for gesture in GESTURES}
 
+# file name should include $gestureIndex. Skip other files
+for root, dirs, files in os.walk(DATA_ROOT):
+    print('root: ', root, ' dirs: ', dirs)
+    for file in files:
+        
+        for gesture in GESTURES:
+            if gesture in file and file.endswith('.txt'):
+                print('file:', file)
+                data = pd.read_csv(os.path.join(root, file), delimiter=" ", header=None)
+                dict_gestures[gesture].append(data.to_numpy())
+
+# Save data using pickle
+path_save = 'data/combined-data/'
+os.mkdir(path_save)
+with open(os.path.join(path_save, 'gestures.pkl'), 'wb') as f:
+    pickle.dump(dict_gestures, f)
+
+#TODO
+# Try extracting and loading in the same loop for efficiency
 
 #%% Preprocessing
 
