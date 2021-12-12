@@ -68,7 +68,7 @@ for root, dirs, files in os.walk(DATA_ROOT):
         
         for gesture in GESTURES:
             if gesture in file and file.endswith('.txt'):
-                print('file:', file)
+                #print('file:', file)
                 data = pd.read_csv(os.path.join(root, file), delimiter=" ", header=None)
                 dict_gestures[gesture].append(data.to_numpy())
 
@@ -81,13 +81,102 @@ with open(os.path.join(path_save, 'gestures.pkl'), 'wb') as f:
 #TODO
 # Try extracting and loading in the same loop for efficiency
 
+
+#%% Load pickle
+
+with open('data/combined-data/gestures.pkl', 'rb') as f:
+    data = pickle.load(f)
+
+data
+
+
 #%% Preprocessing
 
-G = 9.80665 # acceleration of gravity
+# (x,y,z) should start at (0,0,0) at the start of each motion
+#TODO add preprocessing
 
 
 
-#%% Feature extraction
+#%%
+# Integrate
+import scipy.integrate
+
+# A function to do numerical integration
+def integrate(dta):
+    data_integ = {gesture: [] for gesture in dta}
+    for key in dta:
+        print('key: ', key)
+        for i in range(len(dta[key])):
+            integrated = scipy.integrate.cumulative_trapezoid(dta[key][i], axis=0)
+            data_integ[key].append(integrated)
+    return data_integ
+
+data_vel = integrate(data) # Velocity data
+data_pos = integrate(data_vel) # Position data
+
+
+#%% Visualize each axis separately
+# Select a gesture and plot the acceleration for all axes for a single repetition
+
+import matplotlib.pyplot as plt
+
+def visualize(dta):
+    fig = plt.figure(figsize=(10,3))
+    for i in range(3):
+        plt.subplot(1,3,i+1)
+        y = dta[GESTURES[1]][1][:,i]
+        x = range(len(y))
+        plt.scatter(x=x, y=y, s=1)
+    
+    plt.show()
+
+visualize(data)
+visualize(data_vel)
+visualize(data_pos)
+
+
+#%% Interactive 3D Plotting
+import plotly.express as px
+
+# Parameters
+my_data = data_pos
+gesture = GESTURES[5]
+idx_ges = 0
+
+time_ax = range(len(my_data[gesture][idx_ges])) # To have a color scheme for time
+
+fig = px.scatter_3d(x=my_data[gesture][idx_ges][:,0],
+                    y=my_data[gesture][idx_ges][:,1],
+                    z=my_data[gesture][idx_ges][:,2],
+                    color=time_ax
+                    )
+# Default parameters which are used when `layout.scene.camera` is not provided
+camera = dict(
+    up=dict(x=0, y=0, z=1),
+    center=dict(x=0, y=0, z=0),
+    eye=dict(x=1.25, y=1.25, z=1.25)
+)
+
+fig.update_layout(scene_camera=camera)
+fig
+
+#%%
+
+
+
+
+
+#%% Preprocessing
+
+# Normalization
+
+# Numerical integration
+
+
+#%% Feature Extraction/ reduction
+
+# Polynomial fit
+
 
 
 #%% Training
