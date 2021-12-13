@@ -1,12 +1,16 @@
 
 #%% Import statements
-
-
-
-#%% Extract rar files into corresponding folders
-
+from visualization import visualize_axes, visualize_plane, visualize_3d
 import os
 from rarfile import RarFile
+import pandas as pd
+import numpy as np
+import pickle
+
+
+# --------------------------------------------------------------------------------
+# PREPARE DATA
+#%% Extract rar files into corresponding folders
 
 # Extract .rar files
 # Important: Mac users should make sure to have "unrar" or "unar" in the PATH
@@ -21,7 +25,7 @@ for root, dirs, files in os.walk(DATA_ROOT):
         if file.endswith((".rar")):
 
             rar_path = os.path.join(root, file)
-            print(rar_path)
+            #print(rar_path)
             extract_path = os.path.join(root, file.replace('.rar', ''))
             os.mkdir(extract_path)
 
@@ -34,26 +38,6 @@ for root, dirs, files in os.walk(DATA_ROOT):
 # check if directory exists, check if empty etc
 
 #%% Load data
-
-# Top level:
-# $userIndex is the index of the participant from 1 to 8, and $dayIndex is the index
-# of the day from 1 to 7.
-
-# Inside each .rar file:
-# .txt files recording the time series of acceleration of each
-# gesture. The .txt files are named as [somePrefix]$gestureIndex-$repeatIndex.txt, where
-# $gestureIndex is the index of the gesture as in the 8-gesture vocabulary, and
-# $repeatIndex is the index of the repetition of the same gesture pattern from 1 to 10.
-
-# Summary
-# 8 users. 7 days
-# 8 gestures. 10 repetitions for each gesture by each user.
-# For each gesture, 3 columns: x-, y-, z-axis accelerations (unit is G)
-# 
-
-import pandas as pd
-import numpy as np
-import pickle
 
 g_indices = list(range(1,9))
 GESTURES = ["Acceleration" + str(idx) for idx in g_indices]
@@ -80,7 +64,7 @@ with open(os.path.join(path_save, 'gestures.pkl'), 'wb') as f:
 
 #TODO
 # Try extracting and loading in the same loop for efficiency
-
+# Check if pkl file exists
 
 #%% Load pickled data
 
@@ -106,36 +90,18 @@ def integrate(my_data):
 data_vel = integrate(data) # Velocity data
 data_pos = integrate(data_vel) # Position data
 
-
+# ----------------------------------------------------------------------------------
+# VISUALIZATION
 #%% Visualize each axis separately
-# Select a gesture and plot the acceleration for all axes for a single repetition
-
-import matplotlib.pyplot as plt
-
-def visualize(my_data, ges, idx):
-    fig = plt.figure(figsize=(10,3))
-    for i in range(3):
-        plt.subplot(1,3,i+1)
-        y = my_data[GESTURES[1]][1][:,i]
-        x = range(len(y))
-        plt.scatter(x=x, y=y, s=1)
-    
-    plt.show()
 
 gesture = GESTURES[0]
 idx_ges = 0
-visualize(data, gesture, idx_ges) # Acceleration
-visualize(data_vel, gesture, idx_ges) # Velocity
-visualize(data_pos, gesture, idx_ges) # Position
+visualize_axes(data, gesture, idx_ges) # Acceleration
+visualize_axes(data_vel, gesture, idx_ges) # Velocity
+visualize_axes(data_pos, gesture, idx_ges) # Position
 
 
 #%% Visualize the data on a selected plane
-
-def visualize_plane(my_data, ges, idx, ax1, ax2):
-    fig = plt.figure(figsize=(6,4))
-    x = my_data[ges][idx][:,ax1]
-    y = -1.0 * my_data[ges][idx][:,ax2]
-    plt.scatter(x=x, y=y, c=np.arange(len(my_data[ges][idx])), cmap='viridis')
 
 gesture = GESTURES[0]
 idx_ges = 0
@@ -144,54 +110,53 @@ visualize_plane(data_pos, gesture, idx_ges, ax1, ax2)
 
 #%% Interactive 3D Plotting
 
-import plotly.express as px
-
-def visualize_3d(my_data, ges, idx):
-    time_ax = range(len(my_data[ges][idx])) # To have a color scheme for time
-
-    fig = px.scatter_3d(x=my_data[ges][idx][:,0],
-                        y=my_data[ges][idx][:,1],
-                        z=my_data[ges][idx][:,2],
-                        color=time_ax
-                        )
-    # Default parameters which are used when `layout.scene.camera` is not provided
-    scene=dict(
-            camera = dict(
-            up=dict(x=0, y=0, z=1),
-            center=dict(x=0, y=0, z=0),
-            eye=dict(x=2.25, y=1.25, z=1.25)), #the default values are 1.25, 1.25, 1.25
-            xaxis=dict(),
-            yaxis=dict(),
-            zaxis=dict(),
-            aspectmode='data', #this string can be 'data', 'cube', 'auto', 'manual'
-            #a custom aspectratio is defined as follows:
-            aspectratio=dict(x=1, y=1, z=1)
-            )
-
-    fig.update_layout(scene=scene)
-    fig.show()
-
 gesture = GESTURES[0]
 idx_ges = 0
 visualize_3d(data_vel, gesture, idx_ges)
 
+
+# ---------------------------------------------------------------------------------
+# FEATURE EXTRACTION
+#%% Visualize Polynomial fit
+import matplotlib.pyplot as plt
+
+deg_poly = 3
+
+visualize_axes(data_vel, GESTURES[0], 0)
+
+val = data_vel[GESTURES[0]][0]
+fig = plt.figure(figsize=(10,3))
+
+poly = np.polyfit(x=range(len(val)), y=val, deg=deg_poly)
+print(poly)
+
+for i in range(3):
+    poly_new = np.polyval(poly[:,i], range(len(val[:,i])))
+    plt.subplot(1,3,i+1)
+    plt.scatter(x=range(len(poly_new)), y=poly_new, s=1)
+
+plt.show()
+
+
+#%% Apply Polynomial Fit to All Data
+
+deg_poly = 3
+
+my_data = data_vel
+
+data_poly = {gesture: [] for gesture in my_data}
+for key in my_data:
+    #print('key:', key)
+    for idx, val in enumerate(my_data[key]):
+        if len(val) > 1:                
+            poly = np.polyfit(x=range(len(val)), y=val, deg=deg_poly)
+            #print('poly: ', poly)
+            data_poly[key].append(poly.T.flatten())
+
+            
+
+
 #%%
-
-
-
-
-
-#%% Preprocessing
-
-# Normalization
-
-# Numerical integration
-
-
-#%% Feature Extraction/ reduction
-
-# Polynomial fit
-
 
 
 #%% Training
