@@ -9,10 +9,9 @@ import pickle
 
 
 # --------------------------------------------------------------------------------
-# PREPARE DATA
+# 1. DATA PREPARATION
 #%% Extract rar files into corresponding folders
 
-# Extract .rar files
 # Important: Mac users should make sure to have "unrar" or "unar" in the PATH
 # Works on MacOS after installing "unar" with "brew install unar"
 
@@ -64,18 +63,19 @@ with open(os.path.join(path_save, 'gestures.pkl'), 'wb') as f:
 
 #TODO
 # Try extracting and loading in the same loop for efficiency
-# Check if pkl file exists
+# Check if .pkl file already exists
 
 #%% Load pickled data
 
 with open('data/combined-data/gestures.pkl', 'rb') as f:
     data = pickle.load(f)
+#data
 
-data
 
-
+# ---------------------------------------------------------------------------------------------------------------------------------------------
+# 2. PREPROCESSING
 #%%
-# Integrate
+# Integrate the acceleration once to obtain velocity, twice to obtain position
 import scipy.integrate
 
 # A function to do numerical integration
@@ -91,13 +91,16 @@ data_vel = integrate(data) # Velocity data
 data_pos = integrate(data_vel) # Position data
 
 # ----------------------------------------------------------------------------------
-# VISUALIZATION
+# 3. VISUALIZATION
 #%% Visualize each axis separately
 
-gesture = GESTURES[0]
+gesture = GESTURES[2]
 idx_ges = 0
+print("Acceleration")
 visualize_axes(data, gesture, idx_ges) # Acceleration
+print("Velocity")
 visualize_axes(data_vel, gesture, idx_ges) # Velocity
+print("Position")
 visualize_axes(data_pos, gesture, idx_ges) # Position
 
 
@@ -116,18 +119,20 @@ visualize_3d(data_vel, gesture, idx_ges)
 
 
 # ---------------------------------------------------------------------------------
-# FEATURE EXTRACTION
+# 4. FEATURE EXTRACTION
 #%% Visualize Polynomial fit
 import matplotlib.pyplot as plt
 
 deg_poly = 3
 
+print('Original data:')
 visualize_axes(data_vel, GESTURES[0], 0)
 
 val = data_vel[GESTURES[0]][0]
 fig = plt.figure(figsize=(10,3))
 
 poly = np.polyfit(x=range(len(val)), y=val, deg=deg_poly)
+print("Polynomial coefficients")
 print(poly)
 
 for i in range(3):
@@ -135,13 +140,13 @@ for i in range(3):
     plt.subplot(1,3,i+1)
     plt.scatter(x=range(len(poly_new)), y=poly_new, s=1)
 
+print('Polynomial fit:')
 plt.show()
 
 
 #%% Apply Polynomial Fit to All Data
 
 deg_poly = 3
-
 my_data = data_vel
 
 data_poly = {gesture: [] for gesture in my_data}
@@ -167,6 +172,8 @@ for gesture_idx, gesture in enumerate(GESTURES):
         y[count] = gesture_idx
         count += 1
 
+# ---------------------------------------------------------------------------------------------------------------
+# 5. MACHINE LEARNING
 #%% Prepare train and test sets
 
 from sklearn.preprocessing import StandardScaler
@@ -174,31 +181,32 @@ from sklearn.model_selection import train_test_split
 
 scaler = StandardScaler()
 
-X_scaled = scaler.fit_transform(X)
+X_scaled = scaler.fit_transform(X) # obtain zero mean, unit variance
 
-#%%
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.33, random_state=0)
+#%% Split the data into train and test sets randomly
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.30, random_state=0)
 
 
 #%% Training
 from sklearn.linear_model import LogisticRegression
 
-clf = LogisticRegression(random_state=0, verbose=1, multi_class='ovr', solver='lbfgs', max_iter=200)
-
+# Use logistic regressino for multiple classes
+clf = LogisticRegression(random_state=0, verbose=1, multi_class='auto', solver='lbfgs', max_iter=200)
 clf.fit(X_train, y_train)
 
 
 #%% Test
-from sklearn.metrics import confusion_matrix
 
+# Show test set accuracy
 score_test = clf.score(X_test, y_test)
 print("Test set accuracy: ", score_test)
 
 
 #-------------------------------------------------------------------------------------------------------------------
-# EVALUATE
+# 6. EVALUATION
 # %% Visualize results
 import seaborn as sns
+from sklearn.metrics import confusion_matrix
 
 # Confusion matrix
 y_pred = clf.predict(X_test)
@@ -208,4 +216,3 @@ conf_mat
 fig, ax = plt.subplots(figsize=(8,8))
 sns.heatmap(conf_mat, annot=True, fmt='g')
 
-# %%
