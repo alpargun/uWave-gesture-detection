@@ -153,14 +153,59 @@ for key in my_data:
             #print('poly: ', poly)
             data_poly[key].append(poly.T.flatten())
 
-            
 
+#%% Prepare feature and label matrices
+len_data = sum(map(len, data_poly.values()))
+num_features = len(data_poly[GESTURES[0]][0])
+X = np.zeros((len_data, num_features), dtype=float)
+y = np.zeros(len_data, dtype=int)
+
+count = 0
+for gesture_idx, gesture in enumerate(GESTURES):
+    for val in data_poly[gesture]:
+        X[count,:] = val
+        y[count] = gesture_idx
+        count += 1
+
+#%% Prepare train and test sets
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+
+scaler = StandardScaler()
+
+X_scaled = scaler.fit_transform(X)
 
 #%%
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.33, random_state=0)
 
 
 #%% Training
+from sklearn.linear_model import LogisticRegression
+
+clf = LogisticRegression(random_state=0, verbose=1, multi_class='ovr', solver='lbfgs', max_iter=200)
+
+clf.fit(X_train, y_train)
 
 
 #%% Test
- 
+from sklearn.metrics import confusion_matrix
+
+score_test = clf.score(X_test, y_test)
+print("Test set accuracy: ", score_test)
+
+
+#-------------------------------------------------------------------------------------------------------------------
+# EVALUATE
+# %% Visualize results
+import seaborn as sns
+
+# Confusion matrix
+y_pred = clf.predict(X_test)
+conf_mat = confusion_matrix(y_test, y_pred)
+conf_mat
+
+fig, ax = plt.subplots(figsize=(8,8))
+sns.heatmap(conf_mat, annot=True, fmt='g')
+
+# %%
